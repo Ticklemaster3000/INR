@@ -1,0 +1,33 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Audio and data files (too large for git)
+*.wav
+*.mp3
+*.flac
+audio_inr_research/data/raw/
+audio_inr_research/data/processed/
+!audio_inr_research/data/raw/.gitkeep
+!audio_inr_research/data/processed/.gitkeep
+
+# Notebooks and outputs
+*.ipynb
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
