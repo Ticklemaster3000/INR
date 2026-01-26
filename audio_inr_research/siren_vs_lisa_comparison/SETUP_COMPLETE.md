@@ -22,10 +22,10 @@ siren_vs_lisa_comparison/
 │   └── run_all.bat          # Batch script for all experiments
 │
 └── 📂 experiments/          # All trained model checkpoints
-    ├── siren_ds4_h256_l5/  # SIREN 4x: best_model.pth + config.json
-    ├── siren_ds2_h256_l5/  # SIREN 2x: best_model.pth + config.json
-    ├── lisa_ds4_h256_l5/   # LISA 4x: best_model.pth + config.json
-    └── lisa_ds2_h256_l5/   # LISA 2x: best_model.pth + config.json
+    ├── siren_ds4_h256_l5/  # SIREN 4x: 16.77 dB PSNR
+    ├── siren_ds2_h256_l5/  # SIREN 2x: 28.05 dB PSNR
+    ├── lisa_ds4_h256_l4/   # LISA-Enc 4x: 25.74 dB PSNR 🎉
+    └── lisa_ds2_h256_l4/   # LISA-Enc 2x: 26.42 dB PSNR
 
 Note: results/ and docs/ folders are gitignored (not needed for sharing)
 ```

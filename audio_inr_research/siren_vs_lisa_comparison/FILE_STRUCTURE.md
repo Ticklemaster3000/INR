@@ -12,14 +12,16 @@ This folder contains a complete, self-contained comparison between SIREN and LIS
 
 ### `/experiments/` - Trained Models
 
-- **siren_ds4_h256_l5/** - SIREN 4x model checkpoints
+- **siren_ds4_h256_l5/** - SIREN 4x model (16.77 dB PSNR)
   - best_model.pth (best performing checkpoint)
   - config.json (experiment configuration)
   - results.json (training metrics)
   - checkpoint_epoch\*.pth (periodic checkpoints)
-- **siren_ds2_h256_l5/** - SIREN 2x model checkpoints
-- **lisa_ds4_h256_l5/** - LISA 4x model checkpoints
-- **lisa_ds2_h256_l5/** - LISA 2x model checkpoints
+- **siren_ds2_h256_l5/** - SIREN 2x model (28.05 dB PSNR)
+- **lisa_ds4_h256_l4/** - LISA-Enc 4x model (25.74 dB PSNR) 🎉
+- **lisa_ds2_h256_l4/** - LISA-Enc 2x model (26.42 dB PSNR)
+
+_LISA-Enc uses exact architecture from original paper (ConvEncoder with stride=1)_
 
 ### Root Files
 

@@ -66,17 +66,16 @@ Note: Documentation is in the main audio_inr_research folder
 
 ### Use SIREN when:
 
-- Frequency accuracy is critical
-- 2x upsampling tasks
-- Music or audio analysis
-- Need consistent performance
+- 2x upsampling tasks (28.05 dB PSNR)
+- Good waveform reconstruction needed
+- Simpler architecture preferred
 
-### Use LISA when:
+### Use LISA-Enc when:
 
-- Perceptual quality matters
-- Challenging 4x upsampling
+- 4x upsampling tasks (25.74 dB vs SIREN's 16.77 dB!) 🎉
+- Perceptual quality matters (better LSD and PESQ)
 - Speech enhancement
-- Want stable training
+- Arbitrary scale support needed
 
 ---
 
@@ -84,12 +83,14 @@ Note: Documentation is in the main audio_inr_research folder
 
 ### Pre-trained Models Included
 
-| Model | Downsample | Config  | Best PSNR | Location                         |
-| ----- | ---------- | ------- | --------- | -------------------------------- |
-| SIREN | 4x         | h256_l5 | 16.77 dB  | `experiments/siren_ds4_h256_l5/` |
-| SIREN | 2x         | h256_l5 | 28.05 dB  | `experiments/siren_ds2_h256_l5/` |
-| LISA  | 4x         | h256_l5 | 17.14 dB  | `experiments/lisa_ds4_h256_l5/`  |
-| LISA  | 2x         | h256_l5 | 27.41 dB  | `experiments/lisa_ds2_h256_l5/`  |
+| Model    | Downsample | Config  | Test PSNR       | Location                         |
+| -------- | ---------- | ------- | --------------- | -------------------------------- |
+| SIREN    | 4x         | h256_l5 | 16.77 dB        | `experiments/siren_ds4_h256_l5/` |
+| SIREN    | 2x         | h256_l5 | 28.05 dB        | `experiments/siren_ds2_h256_l5/` |
+| LISA-Enc | 4x         | h256_l4 | **25.74 dB** 🎉 | `experiments/lisa_ds4_h256_l4/`  |
+| LISA-Enc | 2x         | h256_l4 | 26.42 dB        | `experiments/lisa_ds2_h256_l4/`  |
+
+_LISA-Enc uses exact architecture from the original paper (stride=1 ConvEncoder)_
 
 ---
 
@@ -167,15 +168,15 @@ python scripts/evaluate.py \
 
 **Higher is Better:**
 
-- **PSNR**: Signal quality (>25 dB = good)
-- **SNR**: Signal-to-noise (>10 dB = good)
-- **PESQ**: Perceptual quality (1.0-4.5, >2.0 = good)
+- **PSNR**: Signal quality (>25 dB = good, LISA-Enc @ 4x: 25.74 dB)
+- **SNR**: Signal-to-noise (>7 dB = good for 4x)
+- **PESQ**: Perceptual quality (1.0-4.5, >1.3 = acceptable)
 
 **Lower is Better:**
 
-- **LSD**: Frequency accuracy (<1.0 = good)
-- **Spectral Convergence**: Spectral similarity (<0.3 = good)
-- **Envelope Distance**: Amplitude envelope match (<0.01 = good)
+- **LSD**: Frequency accuracy (<1.2 = good, <0.9 = excellent)
+- **Spectral Convergence**: Spectral similarity (<0.35 = good)
+- **Envelope Distance**: Amplitude envelope match (<0.005 = good)
 
 ### Quick Comparison
 

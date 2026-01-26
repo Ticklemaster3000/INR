@@ -60,16 +60,26 @@ def evaluate_model(model, audio, downsample_factor, device):
             lr_len = lr_audio_tensor.shape[1]
             latent = lr_audio_tensor.view(batch_size, lr_len, 1)
             pred = model.query_features(coord, latent)
+        elif hasattr(model, 'has_gon_encoder') and model.has_gon_encoder:
+            # LISAEncoder model
+            pred = model(coord, lr_audio_tensor)
         else:
-            # SIREN/MLP - interpolate and concatenate
-            lr_upsampled = torch.nn.functional.interpolate(
-                lr_audio_tensor.transpose(1, 2),
-                size=coord.shape[1],
-                mode='linear',
-                align_corners=False
-            ).transpose(1, 2)
-            coord_with_lr = torch.cat([coord, lr_upsampled], dim=-1)
-            pred = model(coord_with_lr)
+            # SIREN/MLP - check if model expects coord only or coord+lr
+            # Infer from first layer weight shape
+            first_layer_in = model.net[0].linear.weight.shape[1]
+            if first_layer_in == 1:
+                # Coord only
+                pred = model(coord)
+            else:
+                # Coord + LR interpolated
+                lr_upsampled = torch.nn.functional.interpolate(
+                    lr_audio_tensor.transpose(1, 2),
+                    size=coord.shape[1],
+                    mode='linear',
+                    align_corners=False
+                ).transpose(1, 2)
+                coord_with_lr = torch.cat([coord, lr_upsampled], dim=-1)
+                pred = model(coord_with_lr)
         
         pred = pred.squeeze(0).squeeze(-1).cpu()
         
@@ -104,7 +114,7 @@ def main():
     if 'config' in checkpoint:
         saved_config = checkpoint['config']
         model_config = {
-            'in_features': 2 if args.model == 'siren' else 1,  # SIREN uses coord+lr, LISA just coord
+            'in_features': 1,  # Will be inferred from checkpoint
             'out_features': 1,
             'hidden_features': saved_config.get('hidden_features', 256),
             'num_layers': saved_config.get('num_layers', 5),
@@ -113,12 +123,16 @@ def main():
     else:
         # Fallback to command line or defaults
         model_config = {
-            'in_features': 2 if args.model == 'siren' else 1,
+            'in_features': 1,  # Will be inferred from checkpoint
             'out_features': 1,
             'hidden_features': 256,
             'num_layers': 5,
         }
         print(f"Using default config: hidden={model_config['hidden_features']}, layers={model_config['num_layers']}")
+    
+    # Infer in_features from checkpoint for SIREN
+    if args.model == 'siren' and 'net.0.linear.weight' in checkpoint['model_state_dict']:
+        model_config['in_features'] = checkpoint['model_state_dict']['net.0.linear.weight'].shape[1]
     
     if args.model == 'siren':
         model_config['first_omega_0'] = 30.0
@@ -128,27 +142,33 @@ def main():
         model_config['feat_unfold'] = True
     
     # Create and load model
-    # Try LISAEncoder first (new architecture), fallback to plain LISA
-    try:
-        from src.architectures.gon_encoder import LISAEncoder
-        # Infer latent_dim and num_layers from checkpoint
-        latent_dim = checkpoint['model_state_dict']['encoder.conv_blocks.6.weight'].shape[0]
-        # Count weight matrices - LISA adds 1 output layer, so num_layers = count - 1
-        num_weight_layers = len([k for k in checkpoint['model_state_dict'].keys() if 'lisa.imnet' in k and 'weight' in k])
-        num_layers = num_weight_layers - 1  # LISA architecture: input + (num_layers-1) hidden + output
-        
-        model = LISAEncoder(
-            latent_dim=latent_dim,
-            hidden_features=model_config['hidden_features'],
-            num_layers=num_layers
-        ).to(device)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        print(f"Loaded LISAEncoder (latent_dim={latent_dim}, num_layers={num_layers})")
-    except Exception as e:
-        print(f"Failed to load LISAEncoder: {e}")
+    if args.model == 'lisa':
+        # Try LISAEncoder first (new architecture), fallback to plain LISA
+        try:
+            from src.architectures.gon_encoder import LISAEncoder
+            # Infer latent_dim and num_layers from checkpoint
+            latent_dim = checkpoint['model_state_dict']['encoder.conv_blocks.6.weight'].shape[0]
+            # Count weight matrices - LISA adds 1 output layer, so num_layers = count - 1
+            num_weight_layers = len([k for k in checkpoint['model_state_dict'].keys() if 'lisa.imnet' in k and 'weight' in k])
+            num_layers = num_weight_layers - 1  # LISA architecture: input + (num_layers-1) hidden + output
+            
+            model = LISAEncoder(
+                latent_dim=latent_dim,
+                hidden_features=model_config['hidden_features'],
+                num_layers=num_layers
+            ).to(device)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            print(f"Loaded LISAEncoder (latent_dim={latent_dim}, num_layers={num_layers})")
+        except Exception as e:
+            print(f"Failed to load LISAEncoder: {e}")
+            model = build_model(args.model, model_config).to(device)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            print("Loaded standard LISA model")
+    else:
+        # SIREN or other models
         model = build_model(args.model, model_config).to(device)
         model.load_state_dict(checkpoint['model_state_dict'])
-        print("Loaded standard LISA model")
+        print(f"Loaded {args.model.upper()} model")
     print(f"Model loaded from epoch {checkpoint.get('epoch', 'unknown')}")
     
     # Get test files
