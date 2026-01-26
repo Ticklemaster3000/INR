@@ -1,6 +1,9 @@
-# SIREN vs LISA (GON) Audio Super-Resolution Comparison
+# SIREN vs LISA Audio Super-Resolution Comparison
 
-This folder contains a complete comparison study between SIREN and LISA (Lipschitz-bounded Implicit Surface Approximation with Gradient-Origin Networks) architectures for audio super-resolution tasks.
+This folder contains a complete comparison study between SIREN and LISA (Local Implicit representation for Super resolution of Arbitrary scale) architectures for audio super-resolution tasks.
+
+**Paper**: "Learning Continuous Representation of Audio for Arbitrary Scale Super Resolution" (ICASSP 2022)
+**Reference**: https://github.com/ml-postech/LISA
 
 ## 📁 Folder Structure
 
@@ -54,7 +57,7 @@ python scripts/evaluate.py --checkpoint experiments/lisa_ds4_h256_l5/best_model.
 
 ### 4x Downsampling (Harder Task)
 
-| Metric                     | SIREN     | LISA (GON)   | Winner           |
+| Metric                     | SIREN     | LISA         | Winner           |
 | -------------------------- | --------- | ------------ | ---------------- |
 | **PSNR** ↑                 | 16.77 dB  | **17.14 dB** | ✅ LISA (+2.2%)  |
 | **SNR** ↑                  | -1.23 dB  | **-0.86 dB** | ✅ LISA (+30%)   |
@@ -64,25 +67,25 @@ python scripts/evaluate.py --checkpoint experiments/lisa_ds4_h256_l5/best_model.
 
 ### 2x Downsampling (Easier Task)
 
-| Metric     | SIREN        | LISA (GON) | Winner         |
-| ---------- | ------------ | ---------- | -------------- |
-| **PSNR** ↑ | **28.05 dB** | 27.41 dB   | ✅ SIREN       |
-| **SNR** ↑  | **10.04 dB** | 9.41 dB    | ✅ SIREN       |
-| **LSD** ↓  | **0.92**     | 1.06       | ✅ SIREN (15%) |
-| **PESQ** ↑ | 1.635        | **1.933**  | ✅ LISA (+18%) |
+| Metric     | SIREN        | LISA      | Winner         |
+| ---------- | ------------ | --------- | -------------- |
+| **PSNR** ↑ | **28.05 dB** | 27.41 dB  | ✅ SIREN       |
+| **SNR** ↑  | **10.04 dB** | 9.41 dB   | ✅ SIREN       |
+| **LSD** ↓  | **0.92**     | 1.06      | ✅ SIREN (15%) |
+| **PESQ** ↑ | 1.635        | **1.933** | ✅ LISA (+18%) |
 
 ### Key Takeaways
 
 - **SIREN**: Better frequency domain accuracy (LSD), stronger at 2x upsampling
-- **LISA (GON)**: Better perceptual quality (PESQ), competitive spectral characteristics
-- **Use Case**: SIREN for accuracy-critical tasks, LISA for perceptual quality
+- **LISA**: Better perceptual quality (PESQ), competitive spectral characteristics, arbitrary scale support
+- **Use Case**: SIREN for accuracy-critical tasks, LISA for perceptual quality and flexible scaling
 
 ## 🔧 Architecture Details
 
 Both models are implemented in `../src/architectures/models.py`:
 
-- **SIREN**: Sinusoidal Representation Networks
-- **LISA**: Uses Gradient-Origin Networks (GON) for Lipschitz-bounded implicit surface approximation
+- **SIREN**: Sinusoidal Representation Networks (periodic activations)
+- **LISA**: Local Implicit representation for Super resolution of Arbitrary scale (local ensemble + implicit network)
 
 ## 📈 Experiment Configurations
 
