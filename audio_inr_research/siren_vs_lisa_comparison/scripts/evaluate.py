@@ -1,6 +1,8 @@
 """
 Evaluation script for trained Audio INR models.
 """
+import os
+import sys
 import argparse
 import torch
 import json
@@ -8,6 +10,9 @@ from pathlib import Path
 from tqdm import tqdm
 import soundfile as sf
 import numpy as np
+
+# Add parent directory to path to access src
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 
 from src.architectures.models import build_model
 from src.metrics.metrics import MetricSuite

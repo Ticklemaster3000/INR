@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+venv/
+env/
+
+# Data & Models (large files)
+data/raw/*.wav
+data/test/*.wav
+*.pth
+*.pt
+
+# Results & Outputs (generated, not needed for others)
+eval_results/
+siren_vs_lisa_comparison/results/
+
+# Documentation (keep main docs, exclude comparison docs)
+siren_vs_lisa_comparison/docs/
+
+# Experiment scripts (for internal use only)
+run_experiments.bat
+run_experiments.sh
+ACTION_PLAN.md
+URGENT_TODAY.md
+
+# IDE & OS files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+logs/
+wandb/
+
+# Temporary files
+*.tmp
+temp/
+tmp/

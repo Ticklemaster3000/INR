@@ -98,12 +98,150 @@ class MoE(BaseINR):
         return combined
 
 # ==========================================
-# 5. THE PLUG-AND-PLAY REGISTRY
+# 5. LISA (Local Implicit representation for Super resolution of Arbitrary scale)
+# ==========================================
+class PositionEmbedding(nn.Module):
+    """Positional encoding using sine and cosine functions."""
+    def __init__(self, in_channels=1, N_freqs=6):
+        super().__init__()
+        self.N_freqs = N_freqs
+        self.in_channels = in_channels
+        self.funcs = [torch.sin, torch.cos]
+        self.out_channels = in_channels * (len(self.funcs) * N_freqs + 1)
+        self.freq_bands = 2 ** torch.linspace(0, N_freqs - 1, N_freqs)
+
+    def forward(self, x):
+        out = [x]
+        for freq in self.freq_bands:
+            for func in self.funcs:
+                out.append(func(freq * x))
+        return torch.cat(out, -1)
+
+
+class LISA(BaseINR):
+    """
+    LISA: Local Implicit representation for Super resolution of Arbitrary scale.
+    Uses local features and ensemble for better audio reconstruction.
+    """
+    def __init__(
+        self,
+        in_features=1,
+        out_features=1,
+        hidden_features=256,
+        num_layers=4,
+        latent_dim=64,
+        feat_unfold=True,
+        use_positional_encoding=True,
+    ):
+        super().__init__()
+        self.feat_unfold = feat_unfold
+        self.latent_dim = latent_dim
+        
+        # Positional encoding
+        self.embed = None
+        if use_positional_encoding:
+            self.embed = PositionEmbedding(in_features, N_freqs=6)
+            imnet_in_dim = self.embed.out_channels + (latent_dim * 3 if feat_unfold else latent_dim)
+        else:
+            imnet_in_dim = in_features + (latent_dim * 3 if feat_unfold else latent_dim)
+        
+        # IMNET: Implicit network that processes coordinates + features
+        layers = []
+        last_dim = imnet_in_dim
+        for _ in range(num_layers):
+            layers.append(nn.Linear(last_dim, hidden_features))
+            layers.append(nn.ReLU())
+            last_dim = hidden_features
+        layers.append(nn.Linear(last_dim, out_features))
+        self.imnet = nn.Sequential(*layers)
+
+    def query_features(self, coord, latent):
+        """
+        Query features for given coordinates using local ensemble.
+        
+        Args:
+            coord: [B, chunk_len, 1] coordinates
+            latent: [B, num_latents, latent_dim] latent features
+            
+        Returns:
+            pred: [B, chunk_len, out_features]
+        """
+        batch_size = latent.shape[0]
+        latent_dim = latent.shape[2]
+        num_latents = latent.shape[1]
+        chunk_len = coord.shape[1]
+        
+        # Prepare latent features: [B, latent_dim, num_latents]
+        feat = latent.permute(0, 2, 1)
+        
+        # Local ensemble: use previous, current, and next features
+        if self.feat_unfold:
+            feat_prev = torch.cat([feat[:, :, 0:1], feat[:, :, :-1]], dim=2)
+            feat_next = torch.cat([feat[:, :, 1:], feat[:, :, -1:]], dim=2)
+            feat = torch.cat([feat_prev, feat, feat_next], dim=1)  # [B, latent_dim*3, num_latents]
+        
+        # Interpolate features to match coordinate positions
+        # Normalize coordinates to [-1, 1] for grid_sample
+        coord_norm = coord * 2 - 1  # Assuming coord is in [0, 1]
+        
+        # Use interpolation to get features at query coordinates
+        # For 1D audio, we use linear interpolation along the sequence
+        # feat: [B, latent_dim*k, num_latents]
+        # coord_norm: [B, chunk_len, 1] - values in [-1, 1]
+        
+        # Prepare for grid_sample: need [B, C, H, W] input and [B, H_out, W_out, 2] grid
+        feat = feat.unsqueeze(2)  # [B, latent_dim*k, 1, num_latents]
+        
+        # Create grid: [B, chunk_len, 1, 2]
+        coord_x = coord_norm.squeeze(-1)  # [B, chunk_len]
+        coord_y = torch.zeros_like(coord_x)  # Dummy y coordinate
+        coord_grid = torch.stack([coord_x, coord_y], dim=-1)  # [B, chunk_len, 2]
+        coord_grid = coord_grid.unsqueeze(2)  # [B, chunk_len, 1, 2]
+        
+        # Sample features
+        feat_sampled = torch.nn.functional.grid_sample(
+            feat, coord_grid, mode='bilinear', padding_mode='border', align_corners=False
+        )  # [B, latent_dim*k, chunk_len, 1]
+        feat_sampled = feat_sampled.squeeze(3).permute(0, 2, 1)  # [B, chunk_len, latent_dim*k]
+        
+        # Process coordinates
+        rel_coord = coord
+        if self.embed is not None:
+            rel_coord = self.embed(rel_coord)
+        
+        # Concatenate features and coordinates
+        inp = torch.cat([rel_coord, feat_sampled], dim=-1)
+        
+        # Pass through implicit network
+        pred = self.imnet(inp)
+        return pred
+
+    def forward(self, x):
+        """
+        Forward pass assuming x contains both coordinates and latent features.
+        For compatibility, if x is just coordinates, use zero latent.
+        """
+        if x.shape[-1] == 1:
+            # Just coordinates, create dummy latent
+            batch_size = x.shape[0]
+            seq_len = x.shape[1]
+            num_latents = max(seq_len // 100, 1)
+            latent = torch.zeros(batch_size, num_latents, self.latent_dim, device=x.device)
+            return self.query_features(x, latent)
+        else:
+            # Assume x contains [coord, latent_features]
+            # This is a simplified version; actual usage requires proper latent generation
+            return self.imnet(x)
+
+
+# ==========================================
+# 6. THE PLUG-AND-PLAY REGISTRY
 # ==========================================
 MODEL_REGISTRY: Dict[str, Type[BaseINR]] = {
     "mlp": MLP,
     "siren": SIREN,
-    "moe": MoE
+    "moe": MoE,
+    "lisa": LISA,
 }
 
 def build_model(model_name: str, config: Dict[str, Any]) -> BaseINR:
