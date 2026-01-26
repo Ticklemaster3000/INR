@@ -1,9 +1,21 @@
 # SIREN vs LISA Audio Super-Resolution Comparison
 
-This folder contains a complete comparison study between SIREN and LISA (Local Implicit representation for Super resolution of Arbitrary scale) architectures for audio super-resolution tasks.
+This folder contains a comparison study between SIREN and a LISA-inspired architecture for audio super-resolution tasks.
 
-**Paper**: "Learning Continuous Representation of Audio for Arbitrary Scale Super Resolution" (ICASSP 2022)
+## ⚠️ Important Note on LISA Implementation
+
+Our LISA implementation is **inspired by** but **not identical to** the original paper:
+
+**Original LISA Paper**: "Learning Continuous Representation of Audio for Arbitrary Scale Super Resolution" (ICASSP 2022)
 **Reference**: https://github.com/ml-postech/LISA
+
+| Aspect        | Original LISA (ml-postech)                                                      | Our Implementation                                    |
+| ------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Encoder       | **GON** (Gradient Origin Networks) - computes latents via backprop at inference | **Feedforward ConvEncoder** - standard neural network |
+| Inference     | Requires gradient computation (slower)                                          | Direct forward pass (faster)                          |
+| Core Concepts | Local implicit representation, feature unfolding, positional encoding           | ✅ Same concepts preserved                            |
+
+**Why the difference?** GON requires computing gradients through the decoder at inference time, which is computationally expensive and complex to implement correctly. Our simplified encoder-based approach achieves competitive results with simpler, faster inference.
 
 ## 📁 Folder Structure
 
@@ -84,8 +96,15 @@ python scripts/evaluate.py --checkpoint experiments/lisa_ds4_h256_l5/best_model.
 
 Both models are implemented in `../src/architectures/models.py`:
 
-- **SIREN**: Sinusoidal Representation Networks (periodic activations)
-- **LISA**: Local Implicit representation for Super resolution of Arbitrary scale (local ensemble + implicit network)
+- **SIREN**: Sinusoidal Representation Networks with periodic sin(ωx) activations (ω₀=30)
+- **LISA-inspired**: Feedforward encoder + local implicit decoder with:
+  - ConvEncoder for latent feature extraction
+  - Feature unfolding (prev/curr/next concatenation)
+  - Positional encoding (Fourier features)
+  - Grid-sample based feature interpolation
+  - Arbitrary scale support via coordinate queries
+
+**Note**: Our LISA uses a simpler feedforward encoder instead of the original paper's GON (Gradient Origin Networks) approach.
 
 ## 📈 Experiment Configurations
 
