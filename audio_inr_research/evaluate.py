@@ -128,8 +128,27 @@ def main():
         model_config['feat_unfold'] = True
     
     # Create and load model
-    model = build_model(args.model, model_config).to(device)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    # Try LISAEncoder first (new architecture), fallback to plain LISA
+    try:
+        from src.architectures.gon_encoder import LISAEncoder
+        # Infer latent_dim and num_layers from checkpoint
+        latent_dim = checkpoint['model_state_dict']['encoder.conv_blocks.6.weight'].shape[0]
+        # Count weight matrices - LISA adds 1 output layer, so num_layers = count - 1
+        num_weight_layers = len([k for k in checkpoint['model_state_dict'].keys() if 'lisa.imnet' in k and 'weight' in k])
+        num_layers = num_weight_layers - 1  # LISA architecture: input + (num_layers-1) hidden + output
+        
+        model = LISAEncoder(
+            latent_dim=latent_dim,
+            hidden_features=model_config['hidden_features'],
+            num_layers=num_layers
+        ).to(device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Loaded LISAEncoder (latent_dim={latent_dim}, num_layers={num_layers})")
+    except Exception as e:
+        print(f"Failed to load LISAEncoder: {e}")
+        model = build_model(args.model, model_config).to(device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print("Loaded standard LISA model")
     print(f"Model loaded from epoch {checkpoint.get('epoch', 'unknown')}")
     
     # Get test files

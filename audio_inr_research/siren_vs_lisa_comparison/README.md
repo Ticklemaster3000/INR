@@ -70,28 +70,50 @@ python scripts/evaluate.py --checkpoint experiments/lisa_ds4_h256_l5/best_model.
 
 ### 4x Downsampling (Harder Task)
 
-| Metric                     | SIREN     | LISA         | Winner           |
-| -------------------------- | --------- | ------------ | ---------------- |
-| **PSNR** ↑                 | 16.77 dB  | **17.14 dB** | ✅ LISA (+2.2%)  |
-| **SNR** ↑                  | -1.23 dB  | **-0.86 dB** | ✅ LISA (+30%)   |
-| **LSD** ↓                  | **2.13**  | 3.78         | ✅ SIREN (1.77x) |
-| **Spectral Convergence** ↓ | 1.245     | **1.195**    | ✅ LISA (-4.0%)  |
-| **PESQ** ↑                 | **1.197** | 1.066        | ✅ SIREN (+12%)  |
+#### Test Set Results
+
+| Metric                     | SIREN    | LISA-Enc     | Winner           |
+| -------------------------- | -------- | ------------ | ---------------- |
+| **PSNR** ↑                 | 16.77 dB | **25.74 dB** | ✅ LISA (+53.5%) |
+| **SNR** ↑                  | -1.23 dB | **7.74 dB**  | ✅ LISA (+729%)  |
+| **LSD** ↓                  | **2.13** | 1.20         | ✅ LISA (-43.7%) |
+| **Spectral Convergence** ↓ | 1.245    | **0.34**     | ✅ LISA (-72.7%) |
+| **PESQ** ↑                 | 1.197    | **1.38**     | ✅ LISA (+15.3%) |
+
+#### Training Best (Validation)
+
+| Metric     | SIREN    | LISA-Enc     |
+| ---------- | -------- | ------------ |
+| **PSNR** ↑ | 16.77 dB | **30.94 dB** |
+
+_🎉 LISA-Enc dominates 4x downsampling across all metrics!_
 
 ### 2x Downsampling (Easier Task)
 
-| Metric                     | SIREN        | LISA-Enc     | Winner          |
-| -------------------------- | ------------ | ------------ | --------------- |
-| **PSNR** ↑                 | 28.05 dB     | **29.09 dB** | ✅ LISA (+3.7%) |
-| **SNR** ↑                  | **10.04 dB** | 7.52 dB      | ✅ SIREN        |
-| **LSD** ↓                  | **0.92**     | **0.92**     | 🤝 Tie          |
-| **Spectral Convergence** ↓ | N/A          | **0.30**     | ✅ LISA         |
+#### Test Set Results
+
+| Metric                     | SIREN        | LISA-Enc | Winner           |
+| -------------------------- | ------------ | -------- | ---------------- |
+| **PSNR** ↑                 | **28.05 dB** | 26.42 dB | ✅ SIREN (+6.2%) |
+| **SNR** ↑                  | **10.04 dB** | 8.42 dB  | ✅ SIREN         |
+| **LSD** ↓                  | 0.92         | **0.87** | ✅ LISA (-5.4%)  |
+| **Spectral Convergence** ↓ | N/A          | **0.25** | ✅ LISA          |
+| **PESQ** ↑                 | 1.635        | **1.77** | ✅ LISA (+8.3%)  |
+
+#### Training Best (Validation)
+
+| Metric     | SIREN    | LISA-Enc     |
+| ---------- | -------- | ------------ |
+| **PSNR** ↑ | 28.05 dB | **29.09 dB** |
+
+_Note: Training validation PSNR differs from test set due to different data samples._
 
 ### Key Takeaways
 
-- **LISA-Enc**: Achieves **29.09 dB PSNR @ 2x** - best performance! 🎉
-- **SIREN**: Strong baseline (28.05 dB @ 2x), competitive at higher downsampling factors
-- **Use Case**: LISA-Enc for best quality with arbitrary scale support, SIREN for simplicity
+- **SIREN**: Higher test PSNR/SNR (28.05 dB vs 26.42 dB) - better waveform reconstruction
+- **LISA-Enc**: Better LSD (0.87 vs 0.92) and PESQ (1.77 vs 1.64) - better perceptual quality
+- **Training vs Test**: LISA-Enc shows higher training PSNR (29.09 dB) but lower test PSNR - may benefit from more data/regularization
+- **Use Case**: SIREN for accuracy, LISA-Enc for perceptual quality with arbitrary scale support
 
 ## 🔧 Architecture Details
 
