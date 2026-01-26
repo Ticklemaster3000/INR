@@ -80,14 +80,12 @@ python scripts/evaluate.py --checkpoint experiments/lisa_ds4_h256_l5/best_model.
 
 ### 2x Downsampling (Easier Task)
 
-| Metric     | SIREN        | LISA-Enc     | Winner          |
-| ---------- | ------------ | ------------ | --------------- |
-| **PSNR** ↑ | 28.05 dB     | **29.09 dB** | ✅ LISA (+3.7%) |
-| **SNR** ↑  | **10.04 dB** | TBD          | TBD             |
-| **LSD** ↓  | **0.92**     | TBD          | TBD             |
-| **PESQ** ↑ | 1.635        | TBD          | TBD             |
-
-_Note: Full evaluation metrics pending - run `python evaluate.py` to complete._
+| Metric                     | SIREN        | LISA-Enc     | Winner          |
+| -------------------------- | ------------ | ------------ | --------------- |
+| **PSNR** ↑                 | 28.05 dB     | **29.09 dB** | ✅ LISA (+3.7%) |
+| **SNR** ↑                  | **10.04 dB** | 7.52 dB      | ✅ SIREN        |
+| **LSD** ↓                  | **0.92**     | **0.92**     | 🤝 Tie          |
+| **Spectral Convergence** ↓ | N/A          | **0.30**     | ✅ LISA         |
 
 ### Key Takeaways
 
