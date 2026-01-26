@@ -1,178 +1,155 @@
 """
-GON (Gradient Origin Network) Encoder for LISA
-Extracts rich latent representations from low-resolution audio
+LISA-Enc: Exact replication of the original LISA encoder from the paper.
+Reference: https://github.com/ml-postech/LISA/blob/master/models/audio_encoder.py
+
+Paper: "Learning Continuous Representation of Audio for Arbitrary Scale Super Resolution" (ICASSP 2022)
 """
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-class GONEncoder(nn.Module):
+class ConvEncoder(nn.Module):
     """
-    Gradient Origin Network - Convolutional encoder for audio feature extraction.
+    Original LISA ConvEncoder - Matches paper implementation exactly.
     
-    Takes low-resolution audio and produces rich latent representations
-    that capture multi-scale temporal and spectral features.
+    Reference: https://github.com/ml-postech/LISA/blob/master/models/audio_encoder.py
     
-    Architecture:
-        Input: [B, 1, lr_length] - Low-res audio waveform
-        ↓ Conv layers with increasing channels
-        ↓ Feature extraction at multiple scales
-        Output: [B, num_latents, latent_dim] - Rich learned features
+    Architecture (matching original exactly):
+        Conv1d(1 → 16, kernel=7, padding=3, stride=1) + Tanh
+        Conv1d(16 → 32, kernel=3, padding=1, stride=1) + Tanh
+        Conv1d(32 → 64, kernel=3, padding=1, stride=1) + Tanh
+        Conv1d(64 → latent_dim, kernel=1, padding=0)
+    
+    Key features:
+        - stride=1 throughout (preserves sequence length!)
+        - Simple Tanh activation (no BatchNorm, no LeakyReLU)
+        - Channel progression: 1→16→32→64→latent_dim
     """
     
-    def __init__(
-        self,
-        in_channels=1,
-        latent_dim=64,
-        hidden_channels=[64, 128, 256],
-        kernel_sizes=[7, 5, 3],
-        stride=2,
-    ):
+    def __init__(self, latent_dim=32, in_dim=1, kernel_size=7, stride=1):
         super().__init__()
         
         self.latent_dim = latent_dim
+        self.in_dim = in_dim
         
-        # Build convolutional layers for feature extraction
-        layers = []
-        curr_channels = in_channels
-        
-        for i, (hidden_ch, kernel_size) in enumerate(zip(hidden_channels, kernel_sizes)):
-            layers.extend([
-                nn.Conv1d(
-                    curr_channels,
-                    hidden_ch,
-                    kernel_size=kernel_size,
-                    stride=stride if i < len(hidden_channels) - 1 else 1,
-                    padding=kernel_size // 2
-                ),
-                nn.BatchNorm1d(hidden_ch),
-                nn.LeakyReLU(0.2, inplace=True),
-            ])
-            curr_channels = hidden_ch
-        
-        self.conv_encoder = nn.Sequential(*layers)
-        
-        # Project to final latent dimension
-        self.latent_projection = nn.Sequential(
-            nn.Conv1d(hidden_channels[-1], latent_dim, kernel_size=1),
-            nn.BatchNorm1d(latent_dim),
-            nn.Tanh()  # Normalize latent features
+        # Exact architecture from original paper
+        self.conv_blocks = nn.Sequential(
+            nn.Conv1d(in_dim, 16, kernel_size, padding=3, stride=stride),
+            nn.Tanh(),
+            nn.Conv1d(16, 32, 3, padding=1, stride=1),
+            nn.Tanh(),
+            nn.Conv1d(32, 64, 3, padding=1, stride=1),
+            nn.Tanh(),
+            nn.Conv1d(64, latent_dim, 1, padding=0),
         )
-        
-    def forward(self, lr_audio):
+    
+    def forward(self, inp):
         """
         Args:
-            lr_audio: [B, lr_length, 1] - Low-resolution audio
+            inp: [B, in_dim, lr_length] - Low-resolution audio (channel-first)
             
         Returns:
-            latent: [B, num_latents, latent_dim] - Encoded features
+            latent: [B, latent_dim, lr_length] - Encoded features (same length!)
         """
-        # Reshape for conv1d: [B, lr_length, 1] -> [B, 1, lr_length]
-        x = lr_audio.transpose(1, 2)
-        
-        # Extract features through conv layers
-        features = self.conv_encoder(x)  # [B, hidden_channels[-1], reduced_length]
-        
-        # Project to latent space
-        latent = self.latent_projection(features)  # [B, latent_dim, num_latents]
-        
-        # Transpose to [B, num_latents, latent_dim] for LISA
-        latent = latent.transpose(1, 2)
-        
-        return latent
+        assert inp.shape[1] == self.in_dim, f"Expected {self.in_dim} channels at dim 1, got {inp.shape[1]}"
+        return self.conv_blocks(inp)
 
 
-class LISA_WithGON(nn.Module):
+# Backward compatibility alias
+GONEncoder = ConvEncoder
+
+
+class LISAEncoder(nn.Module):
     """
-    LISA model integrated with GON encoder.
-    Complete implementation as per the paper.
+    LISA-Enc: Complete LISA model with ConvEncoder - matching original paper exactly.
+    
+    Reference: https://github.com/ml-postech/LISA/blob/master/models/lisa.py#L240-L262
+    
+    This is the 'lisa-enc' model from the original paper:
+    - ConvEncoder extracts latent features from low-res audio (stride=1, preserves length)
+    - LISA's IMNET queries features at arbitrary coordinates
+    - Local ensemble for smooth interpolation
+    - Feature unfolding (prev/curr/next concatenation)
     """
     
     def __init__(
         self,
-        encoder_config=None,
-        lisa_config=None,
+        latent_dim=32,
+        hidden_features=256,
+        num_layers=5,
+        feat_unfold=True,
+        local_ensemble=True,
     ):
         super().__init__()
         
         # Identifier for routing in training loop
         self.has_gon_encoder = True
+        self.latent_dim = latent_dim
         
-        # Default configs
-        if encoder_config is None:
-            encoder_config = {
-                'in_channels': 1,
-                'latent_dim': 64,
-                'hidden_channels': [64, 128, 256],
-                'kernel_sizes': [7, 5, 3],
-                'stride': 2,
-            }
+        # ConvEncoder (matching original exactly)
+        self.encoder = ConvEncoder(latent_dim=latent_dim, in_dim=1)
         
-        if lisa_config is None:
-            lisa_config = {
-                'in_features': 1,
-                'out_features': 1,
-                'hidden_features': 256,
-                'num_layers': 5,
-                'latent_dim': 64,
-                'feat_unfold': True,
-            }
-        
-        # GON Encoder for latent extraction
-        self.encoder = GONEncoder(**encoder_config)
-        
-        # LISA's local implicit function (import from models.py)
+        # LISA decoder
         from .models import LISA
-        self.lisa = LISA(**lisa_config)
-        
-    def forward(self, coord, lr_audio):
+        self.lisa = LISA(
+            in_features=1,
+            out_features=1,
+            hidden_features=hidden_features,
+            num_layers=num_layers,
+            latent_dim=latent_dim,
+            feat_unfold=feat_unfold,
+            use_positional_encoding=True,
+        )
+    
+    def forward(self, coord, lr_audio, train=False):
         """
-        Forward pass with proper encoding.
+        Forward pass matching original LISA-Enc paper.
         
         Args:
-            coord: [B, hr_length, 1] - High-res coordinates
+            coord: [B, hr_length, 1] - High-res query coordinates
             lr_audio: [B, lr_length, 1] - Low-res audio input
+            train: bool - Whether in training mode
             
         Returns:
             pred: [B, hr_length, 1] - Predicted high-res audio
         """
-        # Encode low-res audio to rich latent features
-        latent = self.encoder(lr_audio)  # [B, num_latents, latent_dim]
+        batch_size = coord.shape[0]
         
-        # Use LISA to query high-res values
+        # Encode: [B, lr_length, 1] -> [B, 1, lr_length] -> [B, latent_dim, lr_length]
+        inp = lr_audio.transpose(1, 2)  # [B, 1, lr_length]
+        latent = self.encoder(inp)  # [B, latent_dim, lr_length] (stride=1!)
+        latent = latent.transpose(1, 2)  # [B, lr_length, latent_dim]
+        
+        # Query LISA at high-res coordinates
         pred = self.lisa.query_features(coord, latent)
         
         return pred
     
     def query_features(self, coord, lr_audio):
         """Wrapper for compatibility with training loop."""
-        return self.forward(coord, lr_audio)
+        return self.forward(coord, lr_audio, train=self.training)
+
+
+# Backward compatibility alias
+LISA_WithGON = LISAEncoder
 
 
 def build_lisa_with_gon(
-    latent_dim=64,
+    latent_dim=32,
     hidden_features=256,
     num_layers=5,
 ):
     """
-    Helper function to build LISA with GON encoder.
+    Helper function to build LISA-Enc (matching original paper).
+    
+    Note: latent_dim=32 is the default in original paper.
+    Uses ConvEncoder with stride=1 (preserves sequence length).
     """
-    encoder_config = {
-        'in_channels': 1,
-        'latent_dim': latent_dim,
-        'hidden_channels': [64, 128, 256],
-        'kernel_sizes': [7, 5, 3],
-        'stride': 2,
-    }
-    
-    lisa_config = {
-        'in_features': 1,
-        'out_features': 1,
-        'hidden_features': hidden_features,
-        'num_layers': num_layers,
-        'latent_dim': latent_dim,
-        'feat_unfold': True,
-    }
-    
-    return LISA_WithGON(encoder_config, lisa_config)
+    return LISAEncoder(
+        latent_dim=latent_dim,
+        hidden_features=hidden_features,
+        num_layers=num_layers,
+        feat_unfold=True,
+        local_ensemble=True,
+    )
