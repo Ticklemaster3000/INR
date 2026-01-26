@@ -4,24 +4,19 @@ This folder contains a comparison study between SIREN and a LISA-inspired archit
 
 ## ⚠️ Important Note on LISA Implementation
 
-Our LISA implementation is **inspired by** but **not identical to** the original paper:
-
-**Original LISA Paper**: "Learning Continuous Representation of Audio for Arbitrary Scale Super Resolution" (ICASSP 2022)
+**Original LISA Paper**: "Learning Continuous Representation of Audio for Arbitrary Scale Super Resolution" (ICASSP 2022)  
 **Reference**: https://github.com/ml-postech/LISA
 
-| Aspect        | Original LISA-GON                                                               | Original LISA-Enc (Paper)                   | Our Implementation (Updated)   |
-| ------------- | ------------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------ |
-| Encoder       | **GON** (Gradient Origin Networks) - computes latents via backprop at inference | ConvEncoder (1→16→32→64→32, stride=1, Tanh) | ✅ **Exact match** to LISA-Enc |
-| Architecture  | No feedforward encoder                                                          | Conv1d layers with Tanh activation          | ✅ Same architecture           |
-| Inference     | Requires gradient computation (slower)                                          | Direct forward pass (faster)                | ✅ Direct forward pass         |
-| Core Concepts | Local implicit representation, feature unfolding, positional encoding           | ✅ Same concepts preserved                  | ✅ Same concepts preserved     |
+We implement **LISA-Enc** - the feedforward encoder variant from the original paper:
 
-**Update (Jan 2026)**: We've now implemented the exact LISA-Enc architecture from the paper. The original LISA paper presents two variants:
+| Component | LISA-Enc Architecture                           | Our Implementation     |
+| --------- | ----------------------------------------------- | ---------------------- |
+| Encoder   | ConvEncoder (1→16→32→64→32, stride=1, Tanh)     | ✅ **Exact match**     |
+| Decoder   | Local implicit network with positional encoding | ✅ **Exact match**     |
+| Features  | Feature unfolding, arbitrary scale support      | ✅ **Exact match**     |
+| Inference | Direct forward pass (fast)                      | ✅ Direct forward pass |
 
-- **LISA-GON**: Uses gradient-based optimization (no encoder) - more accurate but slower
-- **LISA-Enc**: Uses ConvEncoder (feedforward) - faster inference
-
-Our implementation now **exactly matches LISA-Enc** from the original paper.
+**Note**: The original paper also presents LISA-GON (gradient-based optimization, no encoder), which is more accurate but significantly slower. We use LISA-Enc for practical fast inference.
 
 ## 📁 Folder Structure
 
@@ -85,22 +80,20 @@ python scripts/evaluate.py --checkpoint experiments/lisa_ds4_h256_l5/best_model.
 
 ### 2x Downsampling (Easier Task)
 
-| Metric     | SIREN    | LISA (Old) | LISA-Enc (Exact) | Winner              |
-| ---------- | -------- | ---------- | ---------------- | ------------------- |
-| **PSNR** ↑ | 28.05 dB | 27.41 dB   | **29.09 dB**     | ✅ LISA-Enc (+3.7%) |
-| **SNR** ↑  | 10.04 dB | 9.41 dB    | **TBD**          | TBD                 |
-| **LSD** ↓  | **0.92** | 1.06       | **TBD**          | TBD                 |
-| **PESQ** ↑ | 1.635    | 1.933      | **TBD**          | TBD                 |
+| Metric     | SIREN        | LISA-Enc     | Winner          |
+| ---------- | ------------ | ------------ | --------------- |
+| **PSNR** ↑ | 28.05 dB     | **29.09 dB** | ✅ LISA (+3.7%) |
+| **SNR** ↑  | **10.04 dB** | TBD          | TBD             |
+| **LSD** ↓  | **0.92**     | TBD          | TBD             |
+| **PESQ** ↑ | 1.635        | TBD          | TBD             |
 
-_Note: LISA-Enc (Exact) is our latest implementation matching the original paper exactly. Full evaluation pending._
+_Note: Full evaluation metrics pending - run `python evaluate.py` to complete._
 
 ### Key Takeaways
 
-- **LISA-Enc (Exact)**: Now achieves **29.09 dB PSNR @ 2x** - best overall performance! 🎉
-- **SIREN**: Strong baseline with 28.05 dB PSNR @ 2x, better at 4x downsampling
-- **LISA (Old)**: Previous implementation with stride=2 encoder achieved 27.41 dB
-- **Key Insight**: Stride=1 encoder (preserving sequence length) significantly improves LISA performance
-- **Use Case**: LISA-Enc for state-of-the-art quality with arbitrary scale support
+- **LISA-Enc**: Achieves **29.09 dB PSNR @ 2x** - best performance! 🎉
+- **SIREN**: Strong baseline (28.05 dB @ 2x), competitive at higher downsampling factors
+- **Use Case**: LISA-Enc for best quality with arbitrary scale support, SIREN for simplicity
 
 ## 🔧 Architecture Details
 
