@@ -237,9 +237,16 @@ class LISA(BaseINR):
 # ==========================================
 # 6. THE PLUG-AND-PLAY REGISTRY
 # ==========================================
+
+# Import new architectures
+from .siren_square import SIREN_square
+from .siren2_encodec import SIREN2_EnCodec
+
 MODEL_REGISTRY: Dict[str, Type[BaseINR]] = {
     "mlp": MLP,
     "siren": SIREN,
+    "siren2": SIREN_square,          # Standalone SIREN²
+    "siren2_encodec": SIREN2_EnCodec,  # Combined SIREN² + EnCodec
     "moe": MoE,
     "lisa": LISA,
 }
