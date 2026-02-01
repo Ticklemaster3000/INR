@@ -2,13 +2,13 @@
 
 ## Overview
 
-Comparison of **Vanilla SIREN** (baseline) vs **SIREN²+EnCodec (Pretrained)** across **8 audio samples** for audio super-resolution.
+Comparison of **SIREN_square** (baseline) vs **SIREN²+EnCodec (Pretrained)** across **8 audio samples** for audio super-resolution.
 
 ---
 
 ## Summary Results (8 Samples)
 
-| Metric | Vanilla SIREN | Pretrained EnCodec | **Winner** |
+| Metric | SIREN_square | Pretrained EnCodec | **Winner** |
 |--------|---------------|-------------------|------------|
 | **Fitting** | 44.85 dB / 0.49 | 29.13 dB / 1.69 | Vanilla |
 | **Super-Res** | 34.31 dB / 0.83 | **43.96 dB / 1.17** | **🏆 Pretrained** |
@@ -21,7 +21,7 @@ Comparison of **Vanilla SIREN** (baseline) vs **SIREN²+EnCodec (Pretrained)** a
 
 ### Original 3 Samples (0026, 0050, 0075)
 
-**Vanilla SIREN:**
+**SIREN_square:**
 
 | File | Fitting (PSNR/LSD) | Super-Res (PSNR/LSD) |
 |------|-------------------|---------------------|
@@ -43,7 +43,7 @@ Comparison of **Vanilla SIREN** (baseline) vs **SIREN²+EnCodec (Pretrained)** a
 
 ### Extended 5 Samples (0027-0031)
 
-**Vanilla SIREN:**
+**SIREN_square:**
 
 | File | Fitting (PSNR/LSD) | Super-Res (PSNR/LSD) |
 |------|-------------------|---------------------|
@@ -71,7 +71,7 @@ Comparison of **Vanilla SIREN** (baseline) vs **SIREN²+EnCodec (Pretrained)** a
 
 ### Super-Resolution Performance
 
-**Vanilla SIREN:** 34.31 dB (consistent across both sample sets)
+**SIREN_square:** 34.31 dB (consistent across both sample sets)
 - First 3 samples: 34.09 dB
 - Next 5 samples: 34.44 dB
 - **Strength:** Stable performance, good fitting
@@ -88,7 +88,7 @@ Comparison of **Vanilla SIREN** (baseline) vs **SIREN²+EnCodec (Pretrained)** a
 **Information Flow:**
 
 ```
-Vanilla SIREN:
+SIREN_square:
 Coordinates → Hallucinate from scratch → HR Audio
 (No information about missing frequencies)
 
@@ -99,7 +99,7 @@ LR Audio → Pretrained Encoder → Semantic Latents → Decoder Refines → HR 
 
 ### Fitting Performance Trade-off
 
-Vanilla SIREN achieves better fitting (44.85 dB vs 29.13 dB) because:
+SIREN_square achieves better fitting (44.85 dB vs 29.13 dB) because:
 - Full network trains on the target audio
 - No frozen encoder bottleneck
 
@@ -115,7 +115,7 @@ Pretrained approach has worse fitting because:
 
 **SIREN²+EnCodec with pretrained encoder is superior for audio super-resolution.**
 
-- **+9.65 dB improvement** over vanilla SIREN (43.96 dB vs 34.31 dB)
+- **+9.65 dB improvement** over SIREN_square (43.96 dB vs 34.31 dB)
 - Consistent advantage across all 8 samples
 - Encoder's learned representations enable better high-frequency reconstruction
 
@@ -125,7 +125,7 @@ Pretrained approach has worse fitting because:
 
 ## Files & Scripts
 
-- **Phase 1 (Vanilla SIREN):** `benchmark_siren_square.py` (8 samples)
+- **Phase 1 (SIREN_square):** `benchmark_siren_square.py` (8 samples)
 - **Phase 2 (Pretrained EnCodec):** `benchmark_encodec_pretrained.py` (8 samples)
 - **Architecture:** `siren2_encodec.py` (with `use_pretrained=True`)
 - **Setup Instructions:** `SETUP_PRETRAINED.md`
