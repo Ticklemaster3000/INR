@@ -52,3 +52,4 @@ wandb/
 *.tmp
 temp/
 tmp/
+siren2_encodec/visualization/

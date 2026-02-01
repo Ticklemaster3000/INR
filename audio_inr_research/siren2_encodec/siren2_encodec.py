@@ -15,8 +15,8 @@ import torch.nn.functional as F
 import numpy as np
 from typing import Optional
 
-from .seanet_encoder import SimplifiedSEANetEncoder
-from .siren_square import SIREN_square, compute_spectral_centroid
+from seanet_encoder import SimplifiedSEANetEncoder
+from siren_square import SIREN_square, compute_spectral_centroid
 
 
 class BaseINR(nn.Module):
@@ -70,6 +70,11 @@ class SIREN2_EnCodec(BaseINR):
         omega_0: float = 30.0,
         first_omega: float = 30.0,
         use_spectral_noise: bool = True,
+        spectral_centroid: float = 0.0,
+        S0: float = 0.0,
+        S1: float = 0.0,
+        use_pretrained: bool = False,
+        freeze_encoder: bool = True,
         
         # General
         out_features: int = 1,
@@ -97,26 +102,30 @@ class SIREN2_EnCodec(BaseINR):
         self.latent_bias = nn.Parameter(torch.zeros(1, encoder_dim, 1))  # Learnable bias
         
         # SIREN² Decoder
-        # Input: 1 (coord) + 1 (lr_interp) + encoder_dim (latent)
+        # Input: 1 (coord) + encoder_dim (latent)
+        # NOTE: Removed lr_interp to match reference SIREN² (coordinates only + encoder features)
         self.decoder = SIREN_square(
             omega_0=omega_0,
-            in_dim=2 + encoder_dim,
+            in_dim=1 + encoder_dim,
             HL_dim=siren_hidden,
             out_dim=out_features,
             first_omega=first_omega,
             n_HLs=siren_layers,
-            spectral_centroid=0.0,  # Set dynamically if use_spectral_noise
+            spectral_centroid=spectral_centroid,
+            S0=S0,
+            S1=S1,
         )
         
-        # Zero-initialize the last layer for Residual Learning
-        # This ensures Correction starts at 0, so Output = LR + 0 = LR
-        # Guarantees that we don't degrade the baseline performance at initialization
-        with torch.no_grad():
-            self.decoder.net[-1].weight.zero_()
-            self.decoder.net[-1].bias.zero_()
+        # NOTE: Zero-init was removed because we're doing direct prediction (no residual)
+        # The SIREN_square class handles its own weight initialization
         
         # Store current spectral centroid
         self._current_sc = 0.0
+        
+        # Load pretrained encoder weights if requested
+        if use_pretrained:
+            print("Loading pretrained EnCodec 24kHz encoder weights...")
+            self.load_pretrained_encoder(freeze=freeze_encoder)
     
     def encode(self, lr_audio: torch.Tensor) -> torch.Tensor:
         """
@@ -142,23 +151,57 @@ class SIREN2_EnCodec(BaseINR):
         
         return latent
     
+    def load_pretrained_encoder(self, freeze: bool = True):
+        """
+        Load pretrained EnCodec 24kHz encoder weights.
+        
+        Args:
+            freeze: If True, freeze encoder parameters (only train decoder)
+        """
+        try:
+            from encodec import EncodecModel
+        except ImportError:
+            raise ImportError(
+                "encodec library not found. Install with: pip install encodec"
+            )
+        
+        # Load pretrained 24kHz model
+        pretrained_model = EncodecModel.encodec_model_24khz()
+        pretrained_model.set_target_bandwidth(6.0)  # 6 kbps bandwidth
+        
+        # Transfer encoder weights
+        try:
+            self.encoder.load_state_dict(
+                pretrained_model.encoder.state_dict(),
+                strict=False  # Allow minor architecture differences
+            )
+            print("✓ Pretrained encoder weights loaded successfully")
+        except Exception as e:
+            print(f"⚠ Warning: Could not load all pretrained weights: {e}")
+            print("  Continuing with partial weight transfer...")
+        
+        # Optionally freeze encoder parameters
+        if freeze:
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+            print("✓ Encoder weights frozen (decoder-only training)")
+        else:
+            print("✓ Encoder weights unfrozen (full fine-tuning enabled)")
+    
+    
     def decode(
         self,
         coord: torch.Tensor,
         latent: torch.Tensor,
-        lr_audio: torch.Tensor,
         spectral_centroid: Optional[float] = None,
-        lr_interp: Optional[torch.Tensor] = None, # New argument
     ) -> torch.Tensor:
         """
-        Decode coordinates + latent + lr_audio to audio amplitudes.
+        Decode coordinates + latent to audio amplitudes.
         
         Args:
             coord: [B, hr_len, 1] query coordinates
             latent: [B, encoder_dim, T_enc] encoded features
-            lr_audio: [B, lr_len, 1] or [B, 1, lr_len] low-res audio (used for internal interpolation if lr_interp is None)
             spectral_centroid: Optional override for noise injection
-            lr_interp: [B, hr_len, 1] OPTIONAL high-quality upsampled input. If provided, it's used directly.
             
         Returns:
             pred: [B, hr_len, 1] predicted audio
@@ -166,25 +209,6 @@ class SIREN2_EnCodec(BaseINR):
         batch_size = coord.shape[0]
         hr_len = coord.shape[1]
         
-        # Use external interpolation if provided (e.g. Sinc/Scipy), otherwise use internal Linear
-        if lr_interp is None:
-            # Ensure lr_audio is in correct format for interpolation: [B, 1, lr_len]
-            if lr_audio.dim() == 3 and lr_audio.shape[-1] == 1:
-                lr_audio_for_interp = lr_audio.transpose(1, 2)
-            elif lr_audio.dim() == 2:
-                lr_audio_for_interp = lr_audio.unsqueeze(1)
-            else:
-                lr_audio_for_interp = lr_audio
-                
-            # Interpolate LR audio to HR length
-            lr_interp = F.interpolate(
-                lr_audio_for_interp,
-                size=hr_len,
-                mode='linear',
-                align_corners=False
-            )
-            lr_interp = lr_interp.transpose(1, 2) # [B, hr_len, 1]
-
         # Update spectral noise if needed
         if self.use_spectral_noise and spectral_centroid is not None:
             if spectral_centroid != self._current_sc:
@@ -203,15 +227,12 @@ class SIREN2_EnCodec(BaseINR):
         # Transpose to [B, hr_len, encoder_dim]
         latent_interp = latent_interp.transpose(1, 2)
         
-        # Concatenate: [B, hr_len, 1 (coord) + 1 (lr) + encoder_dim]
-        inp = torch.cat([coord, lr_interp, latent_interp], dim=-1)
+        # Concatenate: [B, hr_len, 1 (coord) + encoder_dim (latent)]
+        inp = torch.cat([coord, latent_interp], dim=-1)
         
         # SIREN² decode
-        correction = self.decoder(inp)
-        
-        # Explicit Residual Connection: Output = Base + Correction
-        # This ensures the model starts with at least the baseline performance
-        pred = lr_interp + correction
+        # Direct prediction (NO residual connection - matches reference SIREN²)
+        pred = self.decoder(inp)
         
         return pred
     
@@ -220,7 +241,6 @@ class SIREN2_EnCodec(BaseINR):
         coord: torch.Tensor,
         lr_audio: torch.Tensor,
         spectral_centroid: Optional[float] = None,
-        lr_interp: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
         """
         Forward pass.
@@ -229,7 +249,6 @@ class SIREN2_EnCodec(BaseINR):
             coord: [B, hr_len, 1] high-resolution query coordinates
             lr_audio: [B, lr_len, 1] or [B, 1, lr_len] low-resolution audio
             spectral_centroid: Optional spectral centroid for noise injection
-            lr_interp: [B, hr_len, 1] OPTIONAL high-quality upsampled input
             
         Returns:
             pred: [B, hr_len, 1] predicted high-resolution audio
@@ -250,9 +269,7 @@ class SIREN2_EnCodec(BaseINR):
         pred = self.decode(
             coord=coord,
             latent=latent,
-            lr_audio=lr_audio,
             spectral_centroid=spectral_centroid,
-            lr_interp=lr_interp
         )
         
         return pred
