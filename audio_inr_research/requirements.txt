@@ -1,0 +1,25 @@
+# Core dependencies
+torch>=2.0.0
+torchaudio>=2.0.0
+numpy>=1.20.0
+
+# Data handling
+soundfile>=0.12.0
+librosa>=0.10.0
+datasets>=2.0.0
+
+# Audio quality metrics
+pesq>=0.0.4
+pystoi>=0.3.3
+
+# Training and logging
+tqdm>=4.60.0
+tensorboard>=2.10.0
+
+# Utilities
+scipy>=1.7.0
+matplotlib>=3.5.0
+pyyaml>=6.0
+
+# Optional for better resampling
+resampy>=0.4.2
