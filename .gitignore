@@ -1,33 +1,55 @@
-# Python-generated files
+# Python
 __pycache__/
-*.py[oc]
-build/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
 dist/
-wheels/
-*.egg-info
+build/
+venv/
+env/
 
-# Virtual environments
-.venv
+# Data & Models (large files)
+data/raw/*.wav
+data/test/*.wav
+*.pth
+*.pt
 
-# Audio and data files (too large for git)
-*.wav
-*.mp3
-*.flac
-audio_inr_research/data/raw/
-audio_inr_research/data/processed/
-!audio_inr_research/data/raw/.gitkeep
-!audio_inr_research/data/processed/.gitkeep
+# Results & Outputs (generated, not needed for others)
+eval_results/
+siren_vs_lisa_comparison/results/
 
-# Notebooks and outputs
-*.ipynb
-.ipynb_checkpoints/
+# Documentation (keep main docs, exclude comparison docs)
+siren_vs_lisa_comparison/docs/
 
-# IDE
+# Experiment scripts (for internal use only)
+run_experiments.bat
+run_experiments.sh
+ACTION_PLAN.md
+URGENT_TODAY.md
+SIREN_ARCHITECTURE_EXPLAINED.md
+
+# IDE & OS files
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
+*~
 .DS_Store
 Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Logs
+*.log
+logs/
+wandb/
+
+# Temporary files
+*.tmp
+temp/
+tmp/
+siren2_encodec/visualization/
