@@ -1,12 +1,28 @@
 [project]
 name = "inr"
 version = "0.1.0"
-description = "Add your description here"
+description = "INR ML training project"
 readme = "README.md"
-requires-python = ">=3.12"
+
+# Restrict Python properly
+requires-python = ">=3.12,<3.14"
+
 dependencies = [
     "datasets>=4.5.0",
     "soundfile>=0.13.1",
-    "torch>=2.10.0",
-    "torchaudio>=2.10.0",
+
+    "numpy<2",  # IMPORTANT FIX
+
+    "torch==2.3.1+cu121",
+    "torchaudio==2.3.1+cu121",
 ]
+
+# Add PyTorch index SECOND (not first)
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
+torchaudio = { index = "pytorch-cu121" }
